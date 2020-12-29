@@ -6,8 +6,6 @@ import org.reactivestreams.Subscription;
 
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 public class ArrayPublisher<T> implements Publisher<T> {
@@ -22,20 +20,20 @@ public class ArrayPublisher<T> implements Publisher<T> {
     @Override
     public void subscribe(Subscriber<? super T> subscriber) {
         subscriber.onSubscribe(new Subscription() {
-            final AtomicInteger index = new AtomicInteger(0);
             final AtomicLong requested = new AtomicLong(0);
-            private final AtomicBoolean completed = new AtomicBoolean(false);
-            private final AtomicBoolean cancelled = new AtomicBoolean(false);
+            private Integer index = 0;
+            private boolean completed = false;
+            private volatile boolean cancelled = false;
             private Throwable error = null;
 
             private void processRequest() {
-                while (index.get() < ArrayPublisher.this.array.length && requested.get() > 0) {
+                while (index < ArrayPublisher.this.array.length && requested.get() > 0) {
 
-                    if (this.cancelled.get()) {
+                    if (this.cancelled) {
                         break;
                     }
 
-                    T item = ArrayPublisher.this.array[index.getAndIncrement()];
+                    T item = ArrayPublisher.this.array[index++];
 
                     if (item == null) {
                         subscriber.onError(new NullPointerException());
@@ -51,15 +49,15 @@ public class ArrayPublisher<T> implements Publisher<T> {
                     return;
                 }
 
-                if (ArrayPublisher.this.array.length == this.index.get()) {
-                    completed.set(true);
+                if (ArrayPublisher.this.array.length == this.index) {
+                    completed = true;
                     subscriber.onComplete();
                 }
             }
 
             @Override
             public void request(long l) {
-                if (completed.get() || cancelled.get()) {
+                if (completed || cancelled) {
                     return;
                 }
 
@@ -76,7 +74,7 @@ public class ArrayPublisher<T> implements Publisher<T> {
 
             @Override
             public void cancel() {
-                this.cancelled.set(true);
+                this.cancelled = true;
             }
         });
     }

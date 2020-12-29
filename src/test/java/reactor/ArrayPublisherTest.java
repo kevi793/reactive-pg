@@ -9,12 +9,10 @@ import org.reactivestreams.tck.PublisherVerification;
 import org.reactivestreams.tck.TestEnvironment;
 
 import java.util.ArrayList;
-import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.stream.IntStream;
 import java.util.stream.LongStream;
 
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -225,7 +223,7 @@ public class ArrayPublisherTest extends PublisherVerification<Long> {
             @Override
             public void onSubscribe(Subscription subscription) {
                 this.s = subscription;
-                for (int i=1;i<=n;i++) {
+                for (int i = 1; i <= n; i++) {
                     ForkJoinPool.commonPool()
                             .execute(() -> s.request(1));
                 }
@@ -247,27 +245,7 @@ public class ArrayPublisherTest extends PublisherVerification<Long> {
             }
         });
 
-        latch.await(1000, TimeUnit.MILLISECONDS);
-        List<Integer> list = new ArrayList<>();
-        if (n != collected.size()) {
-            System.out.println("here");
-
-
-
-            for (int i=0;i<collected.size();i++) {
-                try {
-                    if (collected.get(i) != i) {
-                        list.add(i);
-                    }
-                }
-                catch (Exception ex) {
-                    System.out.println("here in catch");
-                }
-
-            }
-
-        }
-
+        Assertions.assertTrue(latch.await(1000, TimeUnit.MILLISECONDS));
         Assertions.assertEquals(n, collected.size());
         assertThat(collected, contains(array));
     }
