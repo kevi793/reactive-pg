@@ -62,9 +62,9 @@ public class ArrayPublisher<T> implements Publisher<T> {
                 }
 
                 if (l <= 0) {
+                    l = 0;
                     this.error = new IllegalArgumentException("Positive request amount required but it was " + l);
                     cancel();
-                    return;
                 }
 
                 if (requested.getAndAdd(l) == 0) {
