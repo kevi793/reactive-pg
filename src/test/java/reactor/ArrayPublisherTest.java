@@ -9,9 +9,12 @@ import org.reactivestreams.tck.PublisherVerification;
 import org.reactivestreams.tck.TestEnvironment;
 
 import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.IntStream;
 import java.util.stream.LongStream;
 
 import static org.hamcrest.MatcherAssert.assertThat;
@@ -99,25 +102,9 @@ public class ArrayPublisherTest extends PublisherVerification<Long> {
 
         Assertions.assertEquals(0, collected.size());
 
-        subscription[0].request(1);
-        assertThat(collected, contains(0L));
-
-        subscription[0].request(1);
+        subscription[0].request(2);
+        Assertions.assertFalse(countDownLatch.await(1000, TimeUnit.MILLISECONDS));
         assertThat(collected, contains(0L, 1L));
-
-        subscription[0].request(1);
-        assertThat(collected, contains(0L, 1L, 2L));
-
-        subscription[0].request(1);
-        assertThat(collected, contains(0L, 1L, 2L, 3L));
-
-        subscription[0].request(20);
-
-        subscription[0].request(20);
-
-        Assertions.assertTrue(countDownLatch.await(1000, TimeUnit.MILLISECONDS));
-
-        assertThat(collected, contains(array));
     }
 
     @Test
@@ -224,8 +211,65 @@ public class ArrayPublisherTest extends PublisherVerification<Long> {
     }
 
     @Test
-    public void t() throws Throwable {
-        this.required_createPublisher3MustProduceAStreamOfExactly3Elements();
+    public void multiThreadingTest() throws InterruptedException {
+        CountDownLatch latch = new CountDownLatch(1);
+        ArrayList<Long> collected = new ArrayList<>();
+        final int n = 100000;
+        Long[] array = generate(n);
+        ArrayPublisher<Long> publisher = new ArrayPublisher<>(array);
+
+        publisher.subscribe(new Subscriber<Long>() {
+
+            private Subscription s;
+
+            @Override
+            public void onSubscribe(Subscription subscription) {
+                this.s = subscription;
+                for (int i=1;i<=n;i++) {
+                    ForkJoinPool.commonPool()
+                            .execute(() -> s.request(1));
+                }
+            }
+
+            @Override
+            public void onNext(Long aLong) {
+                collected.add(aLong);
+            }
+
+            @Override
+            public void onError(Throwable throwable) {
+                latch.countDown();
+            }
+
+            @Override
+            public void onComplete() {
+                latch.countDown();
+            }
+        });
+
+        latch.await(1000, TimeUnit.MILLISECONDS);
+        List<Integer> list = new ArrayList<>();
+        if (n != collected.size()) {
+            System.out.println("here");
+
+
+
+            for (int i=0;i<collected.size();i++) {
+                try {
+                    if (collected.get(i) != i) {
+                        list.add(i);
+                    }
+                }
+                catch (Exception ex) {
+                    System.out.println("here in catch");
+                }
+
+            }
+
+        }
+
+        Assertions.assertEquals(n, collected.size());
+        assertThat(collected, contains(array));
     }
 
 
