@@ -21,10 +21,12 @@ public class MapPublisher<IN, OUT> implements Publisher<OUT> {
         parent.subscribe(new MapSubscriber<>(mapper, subscriber));
     }
 
-    private static class MapSubscriber<IN, OUT> implements Subscriber<IN> {
+    private static class MapSubscriber<IN, OUT> implements Subscriber<IN>, Subscription {
 
         private final Function<IN, OUT> mapper;
         private final Subscriber<? super OUT> actual;
+        private Subscription subscription;
+        private boolean terminated;
 
         public MapSubscriber(Function<IN, OUT> mapper, Subscriber<? super OUT> actual) {
             this.mapper = mapper;
@@ -33,23 +35,49 @@ public class MapPublisher<IN, OUT> implements Publisher<OUT> {
 
         @Override
         public void onSubscribe(Subscription subscription) {
-            actual.onSubscribe(subscription);
+            this.subscription = subscription;
+            actual.onSubscribe(this);
         }
 
         @Override
         public void onNext(IN inputValue) {
-            OUT resultValue = this.mapper.apply(inputValue);
-            actual.onNext(resultValue);
+
+            if (terminated) {
+                return;
+            }
+
+            try {
+                OUT resultValue = this.mapper.apply(inputValue);
+                actual.onNext(resultValue);
+            } catch (Exception ex) {
+                this.onError(ex);
+                this.cancel();
+                this.terminated = true;
+            }
         }
 
         @Override
         public void onError(Throwable throwable) {
-            actual.onError(throwable);
+            if (!terminated) {
+                actual.onError(throwable);
+            }
         }
 
         @Override
         public void onComplete() {
-            actual.onComplete();
+            if (!terminated) {
+                actual.onComplete();
+            }
+        }
+
+        @Override
+        public void request(long l) {
+            this.subscription.request(l);
+        }
+
+        @Override
+        public void cancel() {
+            this.subscription.cancel();
         }
     }
 }
